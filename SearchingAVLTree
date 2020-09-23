@@ -1,0 +1,252 @@
+#include <stdio.h>
+#include <stdlib.h>
+
+struct data
+{
+	int x, height;
+	struct data *left, *right;
+};
+
+
+int max(int a, int b)   //untuk menentukan node akan berada di sisi kanan / kiri
+{
+	if(a < b) return b;
+	else return a;
+}
+
+
+int getHeight (struct data *root)           //untuk menentukan height dari 1 tree
+{
+	if(root==NULL) return 0;
+		return root->height;
+}
+
+int getBFactor (struct data *root)          // Untuk menentukan balance factor pada sisi kanan / kiri
+{
+	if(root==NULL) return 0;
+	return getHeight(root->left) - getHeight(root->right);
+}
+
+
+struct data *rightRotate (struct data *y)
+{
+	struct data *x = y->left;
+	struct data *B = x->right;      //B merupakan node yang akan dialokasikan untuk dilakukan rotate
+	
+	//rotate
+	x->right = y;
+	y->left = B;
+	
+	y->height = max(getHeight(y->left), getHeight(y->right)+1);  	//posisi Y ini akan di swap untuk dilakukan balance, sehingga y dipindahkan pada posisi single rotate.
+	x->height = max(getHeight(x->left), getHeight(x->right)+1);     //posisi x akan menggantikan posisi y sehingga terjadi rotate (single)
+	
+	return x;
+ }
+
+
+
+struct data *leftRotate(struct data *x)
+{
+	struct data *y = x->right;
+	struct data *B = y->left;
+	
+	//rotate
+	y->left = x;
+	x->right = B;
+	
+	x->height = max(getHeight(x->left), getHeight(x->right)+1);
+	y->height = max(getHeight(y->left), getHeight(y->right)+1);
+	
+	return y;
+}
+
+//predecessor : parent yang di delete maka yang menggantikan adalah child (anak) dengan nilai terbesar
+
+struct data *predecessor (struct data *root)
+{
+	struct data *curr = root->left;
+	
+	while(curr->right !=NULL)
+	    curr = curr->right;
+	    
+	return curr;
+}
+
+
+//successor : parent yang didelete maka yang menggantikan adalah child (anak) dengan nilai terkecil
+
+struct data *successor (struct data *root)
+{
+	struct data *curr = root->right;
+	while(curr->left !=NULL)
+	    curr = curr->left;
+	    
+	return curr;
+}
+
+
+struct data *newNode (int x)
+{
+	struct data *curr = (struct data*) malloc (sizeof(data));
+	curr->x = x;
+	curr->height = 1;
+	curr->left = NULL;
+	curr->right = NULL;
+	
+	return curr;
+}
+
+//insert
+struct data *insert (struct data *root, int x)
+{
+	if(root == NULL) return newNode(x);     //jika belum ada node sama sekali, node baru akan menjadi root
+	else if(x < root->x)
+		root->left = insert(root->left, x);
+	else
+	    root->right = insert (root->right, x);
+	    
+	root->height = max(getHeight(root->left), getHeight(root->right))+1;
+	int bFactor = getBFactor(root);
+	
+	if(bFactor > 1 && x < root->left->x)
+	    return rightRotate(root);       //LL = single rotate kiri
+	if(bFactor <-1 && x > root->right->x)
+	    return leftRotate(root);        //RR = single rotate kanan
+
+	if(bFactor > 1 && x > root->left->x)    //LR
+	{
+		root->left = leftRotate(root->left);        //buat sejajar (single rotate) kiri
+		return rightRotate(root);                   //double rotate
+	}
+	
+	if(bFactor < -1 && x< root->right->x)	//RL
+	{
+		root->right = rightRotate(root->right);     //buat sejajar (single rotate) kanan
+		return leftRotate(root);                    //double rotate
+	}
+	
+	return root;
+}
+
+
+//delete
+struct data *deleteValue (struct data *root, int x)
+{
+	if(root == NULL) return NULL;   //node yang ingin didelete tidak ketemu.
+	if(x < root->x)
+	    root->left = deleteValue(root->left, x);        //dilakukan delete dengan nilai x yang ada pada sebelah kiri.
+	else if(x > root->x)
+	    root->right = deleteValue(root->right, x);      //dilakukan delete dengan nilai x di sebelah kanan
+	else
+	{
+		//jika nilai yang dicari ketemu.
+		//case 1 : tidak punya anak yang menggantikan - posisi leaf
+		//case 2 : hanya punya anak di sebelah kiri saja.
+		//case 3 : hanya punya anak di sebelah kanan saja.
+		
+		if(root->left == NULL ||root->right == NULL)
+		{
+			struct data *temp = NULL;
+			if(root->left !=NULL)
+			    temp = root->left;
+			else
+			    temp = root->right;
+
+			 //case 1 :
+			if(temp == NULL)
+			{
+				temp = root;
+				root = NULL;
+			}
+			else    //case 2 & case 3
+				*root = *temp;
+				
+			free(temp);
+		}
+		else
+		{
+			//case 4
+			struct data *temp = predecessor(root);
+			root->x = temp->x;
+		}
+
+	}
+	//rebalance = mengecek keseimbangan setelah dilakukan delete
+	 if(root == NULL) return 0;      //setelah di hapus node nya maka dilakukan rebalancing
+		root->height = max(getHeight(root->left), getHeight(root->right))+1;
+
+	int bFactor = getBFactor(root);
+
+	if(bFactor > 1 && getBFactor(root->left)>=0)
+	    return rightRotate(root);       //LL = single rotate kiri
+	if(bFactor <-1 && getBFactor(root->right)<=0)
+	    return leftRotate(root);        //RR = single rotate kanan
+
+	if(bFactor > 1 && getBFactor(root->left)<0)    //LR
+	{
+		root->left = leftRotate(root->left);        //buat sejajar (single rotate) kiri
+		return rightRotate(root);                   //double rotate
+	}
+
+	if(bFactor < -1 && getBFactor(root->right)>0)	//RL
+	{
+		root->right = rightRotate(root->right);     //buat sejajar (single rotate) kanan
+		return leftRotate(root);                    //double rotate
+	}
+
+	return root;
+}
+
+
+void printAll(struct data *root)
+{
+	if(root==NULL) return;
+	printAll(root->left);
+	printf(" %d ", root->x);
+	printAll(root->right);
+}
+
+struct data *searchNode(struct data *root, int x){ //SEARCH FUNCTION
+	if(root == NULL) {
+		printf("VALUE IS NOT FOUND!\n\n");
+		return NULL;
+	}
+	
+	if(x < root->x) root->left = searchNode(root->left, x);
+	else if(x > root->x) root->right = searchNode(root->right, x);
+	else if(x == root->x) printf("%d is found!\n\n", root->x);
+	else printf("VALUE IS NOT FOUND!\n\n");
+	return root;
+}
+
+struct data *freeAll(struct data *root)
+{
+	if(root ==NULL) return NULL;
+	root->left = freeAll(root->left);
+	root->right = freeAll(root->right);
+	free(root);
+	
+	return NULL;
+}
+
+int main()
+{
+	struct data *root = NULL;
+	root = insert(root,12); //SAMPLE DATA
+	root = insert(root,10);
+    root = insert(root,20);
+	root = insert(root,17);
+	root = insert(root,25);
+	root = insert(root,19);
+	printf("NUMBERS INSERTED :");
+	printAll(root);
+	printf("\n\n");
+	int n;
+	printf("Search for a number : "); // SEARCH IN MAIN
+	scanf("%d", &n);
+	root = searchNode(root,n);
+	root = freeAll(root);
+
+	getchar();
+return 0;
+}
